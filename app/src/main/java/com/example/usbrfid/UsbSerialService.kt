@@ -16,6 +16,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import kotlinx.coroutines.*
 
+
 class UsbSerialService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var port: UsbSerialPort? = null
