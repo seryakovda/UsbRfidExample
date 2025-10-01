@@ -5,7 +5,9 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
 
     <application android:allowBackup="true" android:label="USB RFID" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-        <activity android:name=".MainActivity">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">   <!-- добавлено -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

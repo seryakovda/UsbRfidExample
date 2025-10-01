@@ -8,13 +8,17 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbManager
+import android.net.Network
+
 import android.os.Build
 import android.os.IBinder
+import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import kotlinx.coroutines.*
+import kotlinx.coroutines.NonCancellable.isActive
 
 
 class UsbSerialService : Service() {
@@ -24,6 +28,9 @@ class UsbSerialService : Service() {
 
     // TODO: замените на ваш HTTPS endpoint
     private val serverUrl = "https://yourserver.example/api/rfid"
+
+    // Добавляем функцию toHex
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
     override fun onCreate() {
         super.onCreate()
@@ -61,21 +68,34 @@ class UsbSerialService : Service() {
             Log.i(TAG, "Could not open device. Permission likely missing")
             return
         }
-        port = driver.ports[0]
+
+        port = driver.ports.firstOrNull()
+        if (port == null) {
+            Log.e(TAG, "No ports available in driver")
+            connection.close()
+            return
+        }
+
         try {
-            port?.open(connection)
-            port?.setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+            port!!.open(connection)
+            port!!.setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
             readLoop()
         } catch (e: Exception) {
             Log.e(TAG, "Error opening port", e)
-            try { port?.close() } catch (_: Exception) {}
+        } finally {
+            try {
+                port?.close()
+                connection.close()
+            } catch (_: Exception) {}
         }
     }
 
     private suspend fun readLoop() {
         val localPort = port ?: return
         val buffer = ByteArray(1024)
-        while (isActive(scope.coroutineContext)) {
+
+        // Исправленная проверка
+        while (isActive) {
             try {
                 val len = localPort.read(buffer, 2000)
                 if (len > 0) {
@@ -90,8 +110,8 @@ class UsbSerialService : Service() {
     }
 
     private suspend fun handleRawTagData(data: ByteArray) {
-        val hex = data.toHex()
-        val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+        val hex = data.toHex() // Теперь работает
+        val b64 = Base64.encodeToString(data, Base64.NO_WRAP)
         val json = "{\"uid_hex\":\"$hex\",\"uid_b64\":\"$b64\",\"raw_len\":${data.size},\"source\":\"usb_serial\"}"
         try {
             val res = Network.postJson(serverUrl, json)
